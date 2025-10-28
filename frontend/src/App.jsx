@@ -1,90 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-// Hardcoded project templates with cost breakdowns
-const projectTemplates = [
-  {
-    id: 1,
-    name: "Static Portfolio Website",
-    description: "HTML/CSS/JS site with global CDN delivery",
-    totalCost: 1.5,
-    components: [
-      { service: "S3", description: "Storage (5GB)", cost: 0.12 },
-      { service: "CloudFront", description: "CDN (100GB transfer)", cost: 0.85 },
-      { service: "Route53", description: "DNS hosting", cost: 0.50 }
-    ],
-    estimatedTraffic: "~50K visitors/month",
-    complexity: "Beginner"
-  },
-  {
-    id: 2,
-    name: "Serverless REST API",
-    description: "API with database for small apps",
-    totalCost: 4.5,
-    components: [
-      { service: "Lambda", description: "100K requests, 128MB, 200ms avg", cost: 2.00 },
-      { service: "API Gateway", description: "100K requests", cost: 1.00 },
-      { service: "DynamoDB", description: "1GB storage, 100K reads/writes", cost: 1.25 },
-      { service: "CloudWatch", description: "Basic logs", cost: 0.25 }
-    ],
-    estimatedTraffic: "~100K API calls/month",
-    complexity: "Intermediate"
-  },
-  {
-    id: 3,
-    name: "Scheduled Data Scraper",
-    description: "Run tasks on a schedule, store results",
-    totalCost: 2.0,
-    components: [
-      { service: "Lambda", description: "Daily runs, 5 min each", cost: 0.50 },
-      { service: "EventBridge", description: "Scheduled triggers", cost: 0.00 },
-      { service: "S3", description: "Results storage (10GB)", cost: 0.25 },
-      { service: "DynamoDB", description: "Metadata storage", cost: 1.25 }
-    ],
-    estimatedTraffic: "Daily automated tasks",
-    complexity: "Intermediate"
-  },
-  {
-    id: 4,
-    name: "Small Full-Stack App",
-    description: "Always-on server with database",
-    totalCost: 9.5,
-    components: [
-      { service: "EC2", description: "t4g.nano (ARM, 2 vCPU, 0.5GB RAM)", cost: 3.07 },
-      { service: "RDS", description: "t4g.micro MySQL (1 vCPU, 1GB RAM)", cost: 5.84 },
-      { service: "EBS", description: "20GB SSD storage", cost: 0.40 },
-      { service: "Data Transfer", description: "10GB outbound", cost: 0.19 }
-    ],
-    estimatedTraffic: "~10K users/month",
-    complexity: "Advanced"
-  },
-  {
-    id: 5,
-    name: "Image Processing Service",
-    description: "Upload images, auto-resize/optimize",
-    totalCost: 3.5,
-    components: [
-      { service: "Lambda", description: "50K invocations, 512MB, 2s avg", cost: 2.00 },
-      { service: "S3", description: "Input/output storage (20GB)", cost: 0.50 },
-      { service: "S3", description: "100K PUT/GET requests", cost: 0.50 },
-      { service: "CloudWatch", description: "Logs", cost: 0.50 }
-    ],
-    estimatedTraffic: "~50K images/month",
-    complexity: "Intermediate"
-  },
-  {
-    id: 6,
-    name: "Discord/Slack Bot",
-    description: "Serverless bot responding to commands",
-    totalCost: 1.0,
-    components: [
-      { service: "Lambda", description: "20K invocations, 128MB, 100ms", cost: 0.40 },
-      { service: "API Gateway", description: "Webhook endpoint", cost: 0.20 },
-      { service: "DynamoDB", description: "Bot state/config", cost: 0.40 }
-    ],
-    estimatedTraffic: "~20K bot commands/month",
-    complexity: "Beginner"
-  }
-];
+// API configuration
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 function ProjectCard({ project, isAffordable }) {
   const [expanded, setExpanded] = useState(false);
@@ -111,14 +28,14 @@ function ProjectCard({ project, isAffordable }) {
         </div>
         <div className="text-right ml-4">
           <div className="text-2xl font-bold text-gray-800">
-            ${project.totalCost.toFixed(2)}
+            ${project.total_cost.toFixed(2)}
           </div>
           <div className="text-xs text-gray-500">per month</div>
         </div>
       </div>
 
       <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-        <span>📊 {project.estimatedTraffic}</span>
+        <span>📊 {project.estimated_traffic}</span>
         {isAffordable && <span className="text-green-600 font-medium">✓ Within Budget</span>}
         {!isAffordable && <span className="text-red-600 font-medium">✗ Over Budget</span>}
       </div>
@@ -145,7 +62,7 @@ function ProjectCard({ project, isAffordable }) {
           </div>
           <div className="mt-2 pt-2 border-t border-gray-300 flex justify-between font-semibold">
             <span>Total</span>
-            <span className="font-mono">${project.totalCost.toFixed(2)}</span>
+            <span className="font-mono">${project.total_cost.toFixed(2)}</span>
           </div>
         </div>
       )}
@@ -155,8 +72,70 @@ function ProjectCard({ project, isAffordable }) {
 
 export default function BudgetCalculator() {
   const [budget, setBudget] = useState(10);
-  const affordableProjects = projectTemplates.filter(p => p.totalCost <= budget);
-  const tooExpensive = projectTemplates.filter(p => p.totalCost > budget);
+  const [projectData, setProjectData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch projects from API whenever budget changes
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/projects?budget=${budget}`);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setProjectData(data);
+      } catch (err) {
+        setError(err.message);
+        console.error('Failed to fetch projects:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, [budget]); // Re-run when budget changes
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading projects...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md">
+          <div className="text-red-600 text-5xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Connection Error</h2>
+          <p className="text-gray-600 mb-4">
+            Could not connect to the backend API. Make sure your Python server is running:
+          </p>
+          <code className="block bg-gray-100 p-3 rounded text-sm mb-4">
+            cd backend && uvicorn app.main:app --reload
+          </code>
+          <p className="text-sm text-gray-500">Error: {error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const affordableProjects = projectData?.affordable_projects || [];
+  const tooExpensive = projectData?.expensive_projects || [];
+  const stats = projectData?.stats || {};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
@@ -169,6 +148,10 @@ export default function BudgetCalculator() {
           <p className="text-gray-600">
             Discover what you can build and deploy on AWS within your budget
           </p>
+          <div className="mt-2 inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            Connected to API
+          </div>
         </div>
 
         {/* Budget Input */}
@@ -207,13 +190,13 @@ export default function BudgetCalculator() {
           </div>
           <div className="bg-white rounded-lg shadow p-4 text-center">
             <div className="text-2xl font-bold text-blue-600">
-              ${affordableProjects.length > 0 ? Math.min(...affordableProjects.map(p => p.totalCost)).toFixed(2) : '0.00'}
+              ${stats.cheapest?.toFixed(2) || '0.00'}
             </div>
             <div className="text-sm text-gray-600">Cheapest Option</div>
           </div>
           <div className="bg-white rounded-lg shadow p-4 text-center">
             <div className="text-2xl font-bold text-purple-600">
-              ${affordableProjects.length > 0 ? (budget - Math.max(...affordableProjects.map(p => p.totalCost))).toFixed(2) : budget.toFixed(2)}
+              ${stats.remaining_budget?.toFixed(2) || budget.toFixed(2)}
             </div>
             <div className="text-sm text-gray-600">Budget Remaining</div>
           </div>
@@ -251,6 +234,7 @@ export default function BudgetCalculator() {
         <div className="mt-8 text-center text-sm text-gray-600">
           <p>💡 Costs are estimates based on typical usage patterns. Actual costs may vary.</p>
           <p className="mt-1">Prices based on US East (N. Virginia) region.</p>
+          <p className="mt-2 text-xs text-gray-500">Data fetched from backend API in real-time</p>
         </div>
       </div>
     </div>
