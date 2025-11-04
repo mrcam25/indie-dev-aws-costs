@@ -4,7 +4,7 @@ FastAPI backend for AWS Budget Planner
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from app.projects import get_projects_by_budget, PROJECT_TEMPLATES
+from app.projects import get_projects_by_budget, get_live_project_templates
 
 app = FastAPI(
     title="AWS Budget Planner API",
@@ -56,23 +56,32 @@ def get_projects(
 @app.get("/api/projects/all")
 def get_all_projects():
     """
-    Get all available project templates
+    Get all available project templates with live pricing
     
     Returns:
         List of all project templates
     """
+    from app.projects import get_live_project_templates
+    
+    projects = get_live_project_templates()
+    pricing_source = projects[0].pricing_source if projects else "unknown"
+    
     return {
-        "count": len(PROJECT_TEMPLATES),
-        "projects": PROJECT_TEMPLATES,
+        "count": len(projects),
+        "projects": projects,
+        "pricing_source": pricing_source,
     }
 
 
 @app.get("/api/health")
 def health_check():
     """Detailed health check"""
+    projects = get_live_project_templates()
+    
     return {
         "status": "healthy",
-        "projects_loaded": len(PROJECT_TEMPLATES),
+        "projects_loaded": len(projects),
+        "pricing_source": projects[0].pricing_source if projects else "unknown",
         "endpoints": [
             "GET /",
             "GET /api/projects?budget=10",
